@@ -1,74 +1,72 @@
-import asyncio
-import httpx
-import json
+import subprocess, tempfile, re, os
+from pathlib import Path
 from rich.console import Console
 from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
+from rich.panel import Panel
 
 console = Console()
 
-async def check_platform(client, platform, url):
+def parse_sherlock_output(text):
+    urls = re.findall(r"https?://[^\s,;]+", text)
+    seen, out = set(), []
+    for u in urls:
+        if u not in seen:
+            seen.add(u)
+            out.append(u.rstrip(".,;"))
+    return out
+
+def run_sherlock(username, timeout=120):
+    tmpdir = tempfile.mkdtemp(prefix="sherlock_out_")
+    out_path = Path(tmpdir) / f"{username}.txt"
+    cmd = ["sherlock", username, "--print-found", "--output", str(out_path)]
+
+    console.print(f"[bold blue]Running Sherlock for username:[/bold blue] [cyan]{username}[/cyan]\n")
     try:
-        response = await client.get(url, timeout=8)
-        if response.status_code == 200:
-            return (platform, True, url)
-        elif response.status_code == 404:
-            return (platform, False, url)
-        else:
-            return (platform, None, f"HTTP {response.status_code}")
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        console.print("[red]Sherlock timed out. Try increasing timeout or run with fewer sites.[/red]")
+        return None
     except Exception as e:
-        return (platform, None, f"{type(e).__name__}")
+        console.print(f"[red]Error launching Sherlock:[/red] {e}")
+        return None
 
-async def probe_username(username, sites_file="data/sites.json"):
-    with open(sites_file, "r") as f:
-        PLATFORMS = json.load(f)
+    text = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    try:
+        if out_path.exists():
+            text += "\n" + out_path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        pass
 
-    results = []
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        tasks = []
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[bold blue]Probing platforms..."),
-            BarColumn(),
-            TimeElapsedColumn(),
-            console=console,
-        ) as progress:
-            task = progress.add_task("probe", total=len(PLATFORMS))
-            for platform, pattern in PLATFORMS.items():
-                url = pattern.format(user=username)
-                tasks.append(check_platform(client, platform, url))
+    try:
+        if out_path.exists():
+            out_path.unlink()
+        os.rmdir(tmpdir)
+    except Exception:
+        pass
 
-            for coro in asyncio.as_completed(tasks):
-                res = await coro
-                results.append(res)
-                progress.update(task, advance=1)
+    return parse_sherlock_output(text)
 
-    return results
+def display_results(username, urls):
+    console.print(f"\n🔍 [bold cyan]Sherlock results for username:[/bold cyan] {username}\n")
+    table = Table(title="Verified Username Footprint (Sherlock)", show_lines=True)
+    table.add_column("Platform / Host", style="bold white")
+    table.add_column("Profile URL", style="cyan", overflow="fold")
 
-def display_results(username, results):
-    console.print(f"\n🔍 [bold cyan]Results for username:[/bold cyan] {username}\n")
+    if not urls:
+        table.add_row("-", "[yellow]No profiles found (or Sherlock failed)[/yellow]")
+        console.print(table)
+        return
 
-    table = Table(title="Username Probe Results", show_lines=True)
-    table.add_column("Platform", style="bold white")
-    table.add_column("Status", style="bold")
-    table.add_column("Profile / Info", style="cyan")
-
-    for platform, found, info in results:
-        if found is True:
-            status = "[green]✅ Found[/green]"
-            link = f"[link={info}]{info}[/link]"
-        elif found is False:
-            status = "[red]❌ Not Found[/red]"
-            link = "-"
-        else:
-            status = "[yellow]⚠️ Unknown[/yellow]"
-            link = f"[dim]{info}[/dim]"
-        table.add_row(platform, status, link)
+    for u in urls:
+        host = re.sub(r"^https?://(www\.)?", "", u).split("/")[0]
+        table.add_row(host, f"[link={u}]{u}[/link]")
 
     console.print(table)
-    console.print("[dim]All platforms checked in parallel. ⚡[/dim]")
 
 def run_username_scan():
     username = input("Enter username to probe: ").strip()
-    results = asyncio.run(probe_username(username))
-    display_results(username, results)
+    if not username:
+        console.print("[red]No username provided.[/red]")
+        return
+    urls = run_sherlock(username)
+    display_results(username, urls)
