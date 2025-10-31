@@ -18,9 +18,7 @@ def format_date(date_str):
         return date_str
 
 def clean_description(desc):
-    # Replace <a href="url">…</a> with colored link text
     desc = re.sub(r'<a href="([^"]+)"[^>]*>(.*?)</a>', r"[cyan]\1[/cyan]", desc)
-    # Remove leftover HTML tags
     desc = re.sub(r"<[^>]+>", "", desc)
     return desc.strip()
 
