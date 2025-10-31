@@ -11,7 +11,7 @@ async def generate_report():
     username = input("Enter username (or leave blank to skip): ").strip()
     password = input("Enter password to check (or leave blank to skip): ").strip()
 
-    console.print(f"\n🧾 [bold cyan]Generating OSINT Report for[/bold cyan] {email or username} ...")
+    console.print(f"\n🧾 [bold cyan]Generating Exposr Report for[/bold cyan] {email or username} ...")
 
     hibp_data = await fetch_hibp_data(email) if email else None
     breaches = hibp_data.get("Breaches", []) if isinstance(hibp_data, dict) else []
@@ -24,13 +24,13 @@ async def generate_report():
         pw_count = pwned_password_count(password)
 
     now = datetime.datetime.now().strftime("%d %b %Y, %I:%M %p")
-    html = f"""<html><head><meta charset="utf-8"><title>OSINT Report - {email or username}</title>
+    html = f"""<html><head><meta charset="utf-8"><title>Exposr Report - {email or username}</title>
     <style>
       body{{font-family:Arial;color:#222;background:#f6f6f6;padding:18px}}
       .sec{{background:#fff;padding:12px;border-radius:8px;margin-bottom:14px;box-shadow:0 1px 3px #ccc}}
       a{{color:#0366d6;text-decoration:none}}
     </style></head><body>
-    <h1>🔍 OSINT Report</h1>
+    <h1>🔍 Exposr Report</h1>
     <p><b>Generated:</b> {now}</p>
     <p><b>Email:</b> {email or '-'}<br><b>Username:</b> {username or '-'}</p>
 

@@ -20,7 +20,7 @@ def main():
     elif choice == "3":
         run_pwned_password_count()
     elif choice == "4":
-        console.print("\n🧾 [bold cyan]Starting full OSINT report generator...[/bold cyan]")
+        console.print("\n🧾 [bold cyan]Starting full Exposr report generator...[/bold cyan]")
         asyncio.run(generate_report())
     else:
         console.print("[bold red]Exiting...[/bold red]")
