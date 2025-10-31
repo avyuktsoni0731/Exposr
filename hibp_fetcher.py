@@ -15,8 +15,7 @@ async def fetch_hibp_data(email: str):
             "Chrome/123.0.0.0 Safari/537.36"
         ))
         page = await context.new_page()
-        print(f"🔍 Fetching breach info for {email} ...")
-
+        
         response = await page.goto(url, wait_until="networkidle")
         if not response:
             print("❌ No response received.")
